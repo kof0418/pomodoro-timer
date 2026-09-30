@@ -1237,3 +1237,14 @@ body.mini {
     display: none;
   }
 }
+
+/* Keep the pin state visible in both the full window and mini widget. */
+.icon-btn.pin-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.pin-btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}

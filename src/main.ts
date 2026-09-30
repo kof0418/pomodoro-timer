@@ -44,6 +44,7 @@ let page = "timer",
 let ambient: AudioBufferSourceNode | null = null;
 let audio: AudioContext | undefined;
 let resizing = false;
+let pinPending = false;
 let expandedSize = new LogicalSize(1200, 850);
 let expandedMaximized = false;
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -90,6 +91,40 @@ function theme() {
       : state.settings.theme;
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", theme);
+function pinButton() {
+  const label = pinned ? "取消視窗置頂" : "視窗置頂";
+  return `<button id="pin" class="icon-btn pin-btn" aria-label="${label}" aria-pressed="${pinned}" title="${label}" ${pinPending ? "disabled" : ""}>${icon(pinned ? "pin-off" : "pin")}</button>`;
+}
+function updatePinButton() {
+  const button = document.getElementById("pin");
+  if (!button) return;
+  button.outerHTML = pinButton();
+  createIcons({ icons });
+  on("pin", togglePin);
+}
+async function togglePin() {
+  if (pinPending) return;
+  if (!isTauri()) {
+    toast("視窗置頂可在桌面版使用");
+    return;
+  }
+  pinPending = true;
+  updatePinButton();
+  try {
+    const window = getCurrentWindow();
+    const next = !(await window.isAlwaysOnTop());
+    await window.setAlwaysOnTop(next);
+    pinned = await window.isAlwaysOnTop();
+    if (pinned !== next) throw new Error("Window pin state did not change");
+    toast(pinned ? "已開啟視窗置頂" : "已取消視窗置頂");
+  } catch (error) {
+    console.error("Unable to change window pin state", error);
+    toast("無法設定視窗置頂，請重試");
+  } finally {
+    pinPending = false;
+    updatePinButton();
+  }
+}
 function render() {
   // Finishing a timer must never destroy an in-progress task draft.
   if (document.querySelector("dialog[open]")) return;
@@ -100,7 +135,7 @@ function render() {
     );
     app.innerHTML = `<section class="mini-widget" aria-label="番茄鐘小浮窗">
       <div class="mini-top"><div id="mini-drag" class="mini-drag" title="拖曳移動浮窗">${icon("grip-vertical")}<span>${labels[state.mode]} · 第 ${(state.cycle % state.settings.interval) + 1} 回合</span></div>
-      <button id="pin" class="icon-btn ${pinned ? "accent" : ""}" aria-label="視窗置頂" aria-pressed="${pinned}" title="${pinned ? "取消置頂" : "視窗置頂"}">${icon("pin")}</button>
+      ${pinButton()}
       <button id="expand" class="icon-btn" aria-label="展開完整視窗" title="展開完整視窗 (Esc)">${icon("maximize-2")}</button></div>
       <div class="mini-center"><div id="countdown" class="mini-countdown" role="timer">${time(secondsLeft(state))}</div>
       <button id="toggle" class="mini-toggle" aria-label="${state.deadline ? "暫停計時" : "開始或繼續計時"}" title="${state.deadline ? "暫停" : "開始 / 繼續"} (Space)">${icon(state.deadline ? "pause" : "play")}</button></div>
@@ -128,7 +163,7 @@ function render() {
    )
    .join("")}</nav>
  <div class="sidebar-bottom"><div class="goal-card"><div>${icon("flame")}每日目標<span>${done} / ${state.settings.goal}</span></div><div class="track"><b style="width:${Math.min(100, (done / state.settings.goal) * 100)}%"></b></div><p>${done >= state.settings.goal ? "今天的目標達成了，做得很好。" : "一點一滴，累積你想要的生活。"}</p></div><button data-page="settings" class="nav-item ${page === "settings" ? "selected" : ""}">${icon("settings-2")}偏好設定</button><div class="local-status"><span></span>本機儲存 · 安心專注</div></div></aside>
- <main><header><div class="breadcrumb">我的空間 <span>/</span> ${{ timer: "專注計時", tasks: "任務清單", stats: "專注洞察", settings: "偏好設定" }[page]}</div><div class="header-actions"><span class="date">${new Intl.DateTimeFormat("zh-TW", { month: "long", day: "numeric", weekday: "short" }).format(Date.now())}</span><button class="icon-btn" id="theme" title="切換深色／淺色模式" aria-label="切換深色／淺色模式">${icon("sun-moon")}</button><button class="icon-btn ${pinned ? "accent" : ""}" id="pin" title="視窗置頂" aria-label="視窗置頂">${icon("pin")}</button></div></header>
+ <main><header><div class="breadcrumb">我的空間 <span>/</span> ${{ timer: "專注計時", tasks: "任務清單", stats: "專注洞察", settings: "偏好設定" }[page]}</div><div class="header-actions"><span class="date">${new Intl.DateTimeFormat("zh-TW", { month: "long", day: "numeric", weekday: "short" }).format(Date.now())}</span><button class="icon-btn" id="theme" title="切換深色／淺色模式" aria-label="切換深色／淺色模式">${icon("sun-moon")}</button>${pinButton()}</div></header>
  <div class="content ${mini ? "minimal" : ""}">${
    page === "timer"
      ? `
@@ -309,19 +344,7 @@ function bind() {
     save();
     render();
   });
-  on("pin", async () => {
-    if (!isTauri()) {
-      toast("視窗置頂可在桌面版使用");
-      return;
-    }
-    try {
-      await getCurrentWindow().setAlwaysOnTop(!pinned);
-      pinned = !pinned;
-      render();
-    } catch {
-      toast("無法設定視窗置頂");
-    }
-  });
+  on("pin", togglePin);
   on("mini", toggleMini);
   on("expand", toggleMini);
   document
