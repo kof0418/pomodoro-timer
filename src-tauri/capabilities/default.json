@@ -1,0 +1,21 @@
+{
+  "identifier": "default",
+  "description": "Main window permissions; file access is scoped to paths selected in native dialogs",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-size",
+    "core:window:allow-set-min-size",
+    "core:window:allow-set-resizable",
+    "core:window:allow-set-decorations",
+    "core:window:allow-start-dragging",
+    "core:window:allow-unmaximize",
+    "core:window:allow-maximize",
+    "notification:default",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file"
+  ]
+}
